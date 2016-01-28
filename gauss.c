@@ -11,6 +11,7 @@
 #include <sys/time.h>
 #include <math.h>
 #include <assert.h>
+#include <pthread.h>
 
 /* #define DEBUG */
 
@@ -25,6 +26,8 @@ double **matrix, *X, *R;
 /* Pre-set solution. */
 
 double *X__;
+int nsize = 0;
+int num_threads = 1;
 
 /* Initialize the matirx. */
 
@@ -139,11 +142,31 @@ void getPivot(int nsize, int currow)
 #ifdef DEBUG
 		fprintf(stdout, "pivot row at step %5d is %5d\n", currow, pivotrow);
 #endif
-		for (i = currow; i < nsize; i++) {
-			SWAP(matrix[pivotrow][i],matrix[currow][i]);
-		}
+		//for (i = currow; i < nsize; i++) {
+		//	SWAP(matrix[pivotrow][i],matrix[currow][i]);
+		//}
+		double *t = matrix[currow];
+		matrix[currow] = matrix[pivotrow];
+		matrix[pivotrow] = t;
 		SWAP(R[pivotrow],R[currow]);
 	}
+}
+
+void *fact_row(void* _id) {
+	long long id = (long long) _id;
+	int i = id >> 32, k;
+	int j = id & (-1);
+	double pivotval;
+	while (j < nsize) {
+		pivotval = matrix[j][i];
+		matrix[j][i] = 0.0;
+		for (k = i + 1; k < nsize; k++) {
+			matrix[j][k] -= pivotval * matrix[i][k];
+		}
+		R[j] -= pivotval * R[i];
+		j += num_threads;
+	}
+	pthread_exit(NULL);
 }
 
 /* For all the rows, get the pivot and eliminate all rows and columns
@@ -151,8 +174,10 @@ void getPivot(int nsize, int currow)
 
 void computeGauss(int nsize)
 {
-	int i, j, k;
+	int i, j;
 	double pivotval;
+	void *status;
+	pthread_t *threads = (pthread_t*) malloc(num_threads * sizeof(pthread_t));
 
 	for (i = 0; i < nsize; i++) {
 		getPivot(nsize,i);
@@ -168,14 +193,20 @@ void computeGauss(int nsize)
 		}
 
 		/* Factorize the rest of the matrix. */
-		for (j = i + 1; j < nsize; j++) {
-			pivotval = matrix[j][i];
-			matrix[j][i] = 0.0;
-			for (k = i + 1; k < nsize; k++) {
-				matrix[j][k] -= pivotval * matrix[i][k];
-			}
-			R[j] -= pivotval * R[i];
+		for (j = 0; j < num_threads; j++) {
+			long long para = i;
+			para <<= 32;
+			para |= j + i + 1;
+			pthread_create(threads + j, NULL, fact_row, (void*) para);
+			//pivotval = matrix[j][i];
+			//matrix[j][i] = 0.0;
+			//for (k = i + 1; k < nsize; k++) {
+			//	matrix[j][k] -= pivotval * matrix[i][k];
+			//}
+			//R[j] -= pivotval * R[i];
 		}
+		for (j = 0; j < num_threads; j++)
+			pthread_join(threads[j], &status);
 	}
 }
 
@@ -206,15 +237,29 @@ int main(int argc, char *argv[])
 {
 	int i;
 	struct timeval start, finish;
-	int nsize = 0;
 	double error;
+	char rc;
 
-	if (argc != 2) {
-		fprintf(stderr, "usage: %s <matrixfile>\n", argv[0]);
-		exit(-1);
+	while ((rc = getopt (argc, argv, "hp:")) != -1)
+		switch (rc) 
+		{
+			case 'p':
+				num_threads = atoi (optarg);
+				break;
+			case 'h':
+				printf("Usage: ./gauss [-p <num threads>] matrix file\n");
+				return 0;
+		}
+
+	if (argc <= optind) {
+		printf("Usage: ./gauss [-p <num threads>] matrix file\n");
+		return 0;
 	}
 
-	nsize = initMatrix(argv[1]);
+	printf ("%d tasks\n", num_threads);
+
+	nsize = initMatrix(argv[optind]);
+
 	initRHS(nsize);
 	initResult(nsize);
 
