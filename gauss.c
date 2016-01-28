@@ -154,17 +154,20 @@ void getPivot(int nsize, int currow)
 
 void *fact_row(void* _id) {
 	long long id = (long long) _id;
-	int i = id >> 32, k;
-	int j = id & (-1);
+	int i = id >> 32, j, k;
+	int l = id & (-1);
+	int cols = nsize - i -1;
 	double pivotval;
-	while (j < nsize) {
+	//printf("l=%d\n", l);
+	for (j = i + 1 + l * cols / num_threads; j < i + 1 + (l + 1) * cols / num_threads; j++) {
+	//while (j < nsize) {
 		pivotval = matrix[j][i];
 		matrix[j][i] = 0.0;
 		for (k = i + 1; k < nsize; k++) {
 			matrix[j][k] -= pivotval * matrix[i][k];
 		}
 		R[j] -= pivotval * R[i];
-		j += num_threads;
+		//j += num_threads;
 	}
 	pthread_exit(NULL);
 }
@@ -196,7 +199,7 @@ void computeGauss(int nsize)
 		for (j = 0; j < num_threads; j++) {
 			long long para = i;
 			para <<= 32;
-			para |= j + i + 1;
+			para |= j;
 			pthread_create(threads + j, NULL, fact_row, (void*) para);
 			//pivotval = matrix[j][i];
 			//matrix[j][i] = 0.0;
