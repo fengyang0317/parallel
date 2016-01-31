@@ -12,6 +12,8 @@
 #include <math.h>
 #include <assert.h>
 #include <pthread.h>
+#include <stdbool.h>
+#include <semaphore.h>
 
 /* #define DEBUG */
 
@@ -28,6 +30,7 @@ double **matrix, *X, *R;
 double *X__;
 int nsize = 0;
 int num_threads = 1;
+sem_t th;
 
 /* Initialize the matirx. */
 
@@ -152,22 +155,36 @@ void getPivot(int nsize, int currow)
 	}
 }
 
+pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+int arrived = 0;
+
 void *fact_row(void* _id) {
-	long long id = (long long) _id;
-	int i = id >> 32, j, k;
-	int l = id & (-1);
-	int cols = nsize - i -1;
-	double pivotval;
-	//printf("l=%d\n", l);
-	for (j = i + 1 + l * cols / num_threads; j < i + 1 + (l + 1) * cols / num_threads; j++) {
-	//while (j < nsize) {
-		pivotval = matrix[j][i];
-		matrix[j][i] = 0.0;
-		for (k = i + 1; k < nsize; k++) {
-			matrix[j][k] -= pivotval * matrix[i][k];
+	int id = (int)_id;
+	int cols;
+	int i = 0, j, k;
+	while (1) {
+		pthread_mutex_lock (&mut);	//lock
+		arrived++;
+		if (arrived == num_threads) {
+			arrived = 0;
+			sem_post(&th);
 		}
-		R[j] -= pivotval * R[i];
-		//j += num_threads;
+		pthread_cond_wait (&cond, &mut);
+		pthread_mutex_unlock(&mut);
+		cols = nsize - i - 1;
+		if (!cols)
+			break;
+		double pivotval;
+		for (j = i + 1 + id * cols / num_threads; j < i + 1 + (id + 1) * cols / num_threads; j++) {
+			pivotval = matrix[j][i];
+			matrix[j][i] = 0.0;
+			for (k = i + 1; k < nsize; k++) {
+				matrix[j][k] -= pivotval * matrix[i][k];
+			}
+			R[j] -= pivotval * R[i];
+		}
+		i++;
 	}
 	pthread_exit(NULL);
 }
@@ -180,9 +197,15 @@ void computeGauss(int nsize)
 	int i, j;
 	double pivotval;
 	void *status;
+	sem_init(&th, 0, 0);
 	pthread_t *threads = (pthread_t*) malloc(num_threads * sizeof(pthread_t));
 
+	for (i = 0; i < num_threads; i++) {
+		pthread_create(threads + i, NULL, fact_row, (void*)i);
+	}
+
 	for (i = 0; i < nsize; i++) {
+		sem_wait(&th);
 		getPivot(nsize,i);
 
 		/* Scale the main row. */
@@ -194,23 +217,10 @@ void computeGauss(int nsize)
 			}
 			R[i] /= pivotval;
 		}
-
-		/* Factorize the rest of the matrix. */
-		for (j = 0; j < num_threads; j++) {
-			long long para = i;
-			para <<= 32;
-			para |= j;
-			pthread_create(threads + j, NULL, fact_row, (void*) para);
-			//pivotval = matrix[j][i];
-			//matrix[j][i] = 0.0;
-			//for (k = i + 1; k < nsize; k++) {
-			//	matrix[j][k] -= pivotval * matrix[i][k];
-			//}
-			//R[j] -= pivotval * R[i];
-		}
-		for (j = 0; j < num_threads; j++)
-			pthread_join(threads[j], &status);
+		pthread_cond_broadcast(&cond);
 	}
+	for (j = 0; j < num_threads; j++)
+		pthread_join(threads[j], &status);
 }
 
 /* Solve the equation. */
