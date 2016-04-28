@@ -32,7 +32,7 @@ struct myrow {
     int p;
     int ix;
     bool operator <(const myrow &b) const {
-        return strcmp(buf[p], b.buf[p]) > 0;
+        return strcmp(buf[p], b.buf[b.p]) > 0;
     }
 };
 
