@@ -28,12 +28,12 @@ struct mykey {
 
 struct myrow {
     char buf[BUF + BUF][100];
-    //char *buf[BUF + BUF];
+    //char (*buf)[100];
     int p;
     int ix;
-    //bool operator <(const myrow &b) const {
-    //    return strcmp(buf[p], b.buf[p]) > 0;
-    //}
+    bool operator <(const myrow &b) const {
+        return strcmp(buf[p], b.buf[p]) > 0;
+    }
 };
 
 bool lt(const myrow *a, const myrow *b) {
@@ -109,9 +109,7 @@ int main(int argc, char *argv[]) {
         MPI_Request reqs[numtasks];
         for (int j = 1; j < numtasks; j++) {
             total += sizebuf[j];
-            //for (int k = 0; k < BUF + BUF; k++) {
-            //    row[j].buf[k] = new char[100];
-            //}
+            //row[j].buf = new char[BUF + BUF][100];
             MPI_Recv(row[j].buf, 100 * BUF, MPI_CHAR, j, 0, MPI_COMM_WORLD, &stat);
             //MPI_Irecv(row[j].buf, 100 * BUF, MPI_CHAR, j, 0, MPI_COMM_WORLD, &reqs[j]);
             //MPI_Wait(&reqs[j], &stat);
@@ -128,15 +126,24 @@ int main(int argc, char *argv[]) {
         write(fd, "", 1);
         addr = (char*)mmap(NULL, total * 100, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         make_heap(prow + 1, prow + numtasks, lt);
+        for (int j = 1; j < numtasks; j++) {
+            printf("%d %d |",j,prow[j]->p);
+            for (int k = 0; k < 10; k++)
+                putchar(prow[j]->buf[0][k]);
+            puts("");
+        }
+        //MPI_Finalize();
+        //return 0;
         for (i = 0; i < total; i++) {
-            //printf("%d %d\t%d\n",sizebuf[1], sizebuf[2], prow[1]->ix);
+            //printf("%d %d\t%d\n",siz * 100ebuf[1], sizebuf[2], prow[1]->ix);
             memcpy(addr + i * 100, prow[1]->buf[prow[1]->p], 100);
+            //puts(prow[1]->buf[prow[1]->p]);
             pop_heap(prow + 1, prow + numtasks, lt);
             prow[numtasks - 1]->p++;
             if (prow[numtasks - 1]->p == BUF + BUF)
                 prow[numtasks - 1]->p = 0;
-            int j = prow[numtasks - 1]->ix;
             if (prow[numtasks - 1]->p % BUF == 0) {
+                int j = prow[numtasks - 1]->ix;
                 if (sizebuf[j]) {
                     //puts("start wait");
                     MPI_Wait(&reqs[j], &stat);
