@@ -12,7 +12,7 @@
 #include <algorithm>
 using namespace std;
 
-#define BUF 1000
+#define BUF 100000
 int numtasks, rank;
 
 #define handle_error(msg) \
@@ -32,13 +32,9 @@ struct myrow {
     int p;
     int ix;
     bool operator <(const myrow &b) const {
-        return strcmp(buf[p], b.buf[p]) > 0;
+        return strcmp(buf[p], b.buf[b.p]) > 0;
     }
 };
-
-bool lt(const myrow *a, const myrow *b) {
-    return strcmp(a->buf[a->p], b->buf[b->p]) > 0;
-}
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -133,7 +129,7 @@ int main(int argc, char *argv[]) {
         //MPI_Finalize();
         //return 0;
         for (i = 0; i < total; i++) {
-            //printf("%d %d\t%d\n",siz * 100ebuf[1], sizebuf[2], prow[1]->ix);
+            //printf("%d %d\t%d\n",sizebuf[1], sizebuf[2], row[1].ix);
             memcpy(addr + i * 100, row[1].buf[row[1].p], 100);
             //puts(prow[1]->buf[prow[1]->p]);
             pop_heap(row + 1, row + numtasks);
