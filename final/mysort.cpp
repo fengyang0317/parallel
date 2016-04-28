@@ -10,9 +10,10 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <algorithm>
+#include <assert.h>
 using namespace std;
 
-#define BUF 100000
+#define BUF 1
 int numtasks, rank;
 
 #define handle_error(msg) \
@@ -129,7 +130,11 @@ int main(int argc, char *argv[]) {
         //MPI_Finalize();
         //return 0;
         for (i = 0; i < total; i++) {
-            //printf("%d %d\t%d\n",sizebuf[1], sizebuf[2], row[1].ix);
+            for (int j = 1; j < 11; j++) {
+                printf("%d ",sizebuf[j]);
+            }
+            printf("%d\t%d\n", row[1].ix, numtasks);
+            assert(numtasks > 1);
             memcpy(addr + i * 100, row[1].buf[row[1].p], 100);
             //puts(prow[1]->buf[prow[1]->p]);
             pop_heap(row + 1, row + numtasks);
@@ -162,7 +167,7 @@ int main(int argc, char *argv[]) {
         munmap(addr, total * 100);
         close(fd);
         gettimeofday(&finish, 0);
-        cout << finish.tv_sec - start.tv_sec << endl;
+        cout << "time:" << finish.tv_sec - start.tv_sec << endl;
     }
 
     MPI_Finalize();
