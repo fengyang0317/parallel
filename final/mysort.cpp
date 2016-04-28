@@ -104,7 +104,6 @@ int main(int argc, char *argv[]) {
         MPI_Gather(&len, 1, MPI_LONG_LONG, sizebuf, 1, MPI_LONG_LONG, 0, MPI_COMM_WORLD);
         long long total = 0;
         myrow row[numtasks];
-        myrow *prow[numtasks];
         MPI_Status stat;
         MPI_Request reqs[numtasks];
         for (int j = 1; j < numtasks; j++) {
@@ -118,44 +117,43 @@ int main(int argc, char *argv[]) {
             row[j].ix = j;
             row[j].p = 0;
             sizebuf[j] -= BUF;
-            prow[j] = row + j;
         }
         cout << "total " << total << endl;
         fd = open("/localdisk/yfeng23/res", O_RDWR | O_CREAT | O_TRUNC, S_IRWXU);
         lseek(fd, total * 100 - 1, SEEK_SET);
         write(fd, "", 1);
         addr = (char*)mmap(NULL, total * 100, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-        make_heap(prow + 1, prow + numtasks, lt);
-        for (int j = 1; j < numtasks; j++) {
-            printf("%d %d |",j,prow[j]->p);
-            for (int k = 0; k < 10; k++)
-                putchar(prow[j]->buf[0][k]);
-            puts("");
-        }
+        make_heap(row + 1, row + numtasks);
+        //for (int j = 1; j < numtasks; j++) {
+        //    printf("%d %d |",j,prow[j]->p);
+        //    for (int k = 0; k < 10; k++)
+        //        putchar(prow[j]->buf[0][k]);
+        //    puts("");
+        //}
         //MPI_Finalize();
         //return 0;
         for (i = 0; i < total; i++) {
             //printf("%d %d\t%d\n",siz * 100ebuf[1], sizebuf[2], prow[1]->ix);
-            memcpy(addr + i * 100, prow[1]->buf[prow[1]->p], 100);
+            memcpy(addr + i * 100, row[1].buf[row[1].p], 100);
             //puts(prow[1]->buf[prow[1]->p]);
-            pop_heap(prow + 1, prow + numtasks, lt);
-            prow[numtasks - 1]->p++;
-            if (prow[numtasks - 1]->p == BUF + BUF)
-                prow[numtasks - 1]->p = 0;
-            if (prow[numtasks - 1]->p % BUF == 0) {
-                int j = prow[numtasks - 1]->ix;
+            pop_heap(row + 1, row + numtasks);
+            row[numtasks - 1].p++;
+            if (row[numtasks - 1].p == BUF + BUF)
+                row[numtasks - 1].p = 0;
+            if (row[numtasks - 1].p % BUF == 0) {
+                int j = row[numtasks - 1].ix;
                 if (sizebuf[j]) {
                     //puts("start wait");
                     MPI_Wait(&reqs[j], &stat);
                     //puts("end wait");
-                    if (prow[numtasks - 1]->p == BUF) {
-                        MPI_Irecv(prow[numtasks - 1]->buf, 100 * BUF, MPI_CHAR, j, 0, MPI_COMM_WORLD, &reqs[j]);
+                    if (row[numtasks - 1].p == BUF) {
+                        MPI_Irecv(row[numtasks - 1].buf, 100 * BUF, MPI_CHAR, j, 0, MPI_COMM_WORLD, &reqs[j]);
                     }
                     else {
-                        MPI_Irecv(prow[numtasks - 1]->buf + BUF, 100 * BUF, MPI_CHAR, j, 0, MPI_COMM_WORLD, &reqs[j]);
+                        MPI_Irecv(row[numtasks - 1].buf + BUF, 100 * BUF, MPI_CHAR, j, 0, MPI_COMM_WORLD, &reqs[j]);
                     }
                     sizebuf[j] -= BUF;
-                    push_heap(prow + 1, prow + numtasks, lt);
+                    push_heap(row + 1, row + numtasks);
                 }
                 else {
                     numtasks--;
