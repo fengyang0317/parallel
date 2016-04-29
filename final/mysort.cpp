@@ -13,7 +13,7 @@
 #include <assert.h>
 using namespace std;
 
-#define BUF 1
+#define BUF 1000
 int numtasks, rank;
 
 #define handle_error(msg) \
@@ -28,8 +28,8 @@ struct mykey {
 };
 
 struct myrow {
-    char buf[BUF + BUF][100];
-    //char (*buf)[100];
+    //char buf[BUF + BUF][100];
+    char (*buf)[100];
     int p;
     int ix;
     bool operator <(const myrow &b) const {
@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
         MPI_Request reqs[numtasks];
         for (int j = 1; j < numtasks; j++) {
             total += sizebuf[j];
-            //row[j].buf = new char[BUF + BUF][100];
+            row[j].buf = new char[BUF + BUF][100];
             MPI_Recv(row[j].buf, 100 * BUF, MPI_CHAR, j, 0, MPI_COMM_WORLD, &stat);
             //MPI_Irecv(row[j].buf, 100 * BUF, MPI_CHAR, j, 0, MPI_COMM_WORLD, &reqs[j]);
             //MPI_Wait(&reqs[j], &stat);
@@ -130,10 +130,10 @@ int main(int argc, char *argv[]) {
         //MPI_Finalize();
         //return 0;
         for (i = 0; i < total; i++) {
-            for (int j = 1; j < 11; j++) {
-                printf("%d ",sizebuf[j]);
-            }
-            printf("%d\t%d\n", row[1].ix, numtasks);
+            //for (int j = 1; j < 11; j++) {
+            //    printf("%d ",sizebuf[j]);
+            //}
+            //printf("%d\t%d\n", row[1].ix, numtasks);
             assert(numtasks > 1);
             memcpy(addr + i * 100, row[1].buf[row[1].p], 100);
             //puts(prow[1]->buf[prow[1]->p]);
@@ -159,6 +159,9 @@ int main(int argc, char *argv[]) {
                 else {
                     numtasks--;
                 }
+            }
+            else {
+                push_heap(row + 1, row + numtasks);
             }
             if (i % (total/10) == 0) {
                 puts("10\% finished");
